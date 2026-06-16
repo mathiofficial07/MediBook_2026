@@ -25,14 +25,14 @@ const Doctors = () => {
       return data.map(d => ({
         id: d._id,
         name: d.name,
-        specialization: d.doctorProfile.specialization,
-        avatar: d.avatar,
-        rating: d.doctorProfile.rating,
-        reviews: d.doctorProfile.reviews,
-        experience: d.doctorProfile.experience,
-        fee: d.doctorProfile.fee,
-        location: d.doctorProfile.location,
-        available: d.doctorProfile.available,
+        specialization: d.doctorProfile?.specialization || "General Medicine",
+        avatar: d.avatar || (d.name ? d.name[0] : "D"),
+        rating: d.doctorProfile?.rating || 0,
+        reviews: d.doctorProfile?.reviews || 0,
+        experience: d.doctorProfile?.experience || 0,
+        fee: d.doctorProfile?.fee || 0,
+        location: d.doctorProfile?.location || "Unknown",
+        available: d.doctorProfile?.available !== false,
       }));
     }
   });
