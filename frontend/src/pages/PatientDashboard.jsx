@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   CalendarCheck,
@@ -49,48 +49,108 @@ const statusConfig = {
   },
 };
 
+import { appointmentAPI, prescriptionAPI } from "@/lib/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
 const PatientDashboard = () => {
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+
+  if (!userInfo || !userInfo._id || userInfo.role !== 'patient') {
+    return <Navigate to="/login" replace />;
+  }
+
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState("appointments");
   const [filter, setFilter] = useState("all");
-  const [appointments, setAppointments] = useState(
-    mockAppointments.filter((a) => a.patientName === "John Doe"),
-  );
-  const [favorites, setFavorites] = useState(["doc-1", "doc-3"]);
   const [prescriptionModal, setPrescriptionModal] = useState(null);
-  const [profile, setProfile] = useState({
-    name: "John Doe",
-    email: "john@example.com",
-    phone: "+1 555-0101",
-    address: "123 Main St, New York, NY",
+  const [favorites, setFavorites] = useState(userInfo.favorites || []);
+
+
+  const { data: appointments = [], isLoading: appointmentsLoading } = useQuery({
+    queryKey: ['appointments', userInfo._id],
+    queryFn: async () => {
+      const { data } = await appointmentAPI.getMyAppointments();
+      return data.map(a => ({
+        id: a._id,
+        doctorId: a.doctor?._id,
+        doctorName: a.doctor?.name || "Unknown Doctor",
+        specialization: a.doctor?.doctorProfile?.specialization || "General Medicine",
+        date: a.date,
+        time: a.time,
+        status: a.status,
+        patientName: a.patient?.name || userInfo.name || 'Patient',
+      }));
+    },
+    enabled: !!userInfo._id,
   });
 
-  const filtered =
-    filter === "all"
-      ? appointments
-      : appointments.filter((a) => a.status === filter);
-  const patientPrescriptions = mockPrescriptions.filter(
-    (p) => p.patientName === "John Doe",
-  );
+  const { data: patientPrescriptions = [] } = useQuery({
+    queryKey: ['prescriptions', userInfo._id],
+    queryFn: async () => {
+      const { data } = await prescriptionAPI.getMyPrescriptions();
+      return data.map(p => ({
+        id: p._id,
+        doctorName: p.doctor?.name || 'Unknown Doctor',
+        date: p.createdAt,
+        diagnosis: p.diagnosis || '',
+        medications: p.medications || [],
+        notes: p.notes || '',
+      }));
+    },
+    enabled: !!userInfo._id,
+  });
+
+
+  const cancelMutation = useMutation({
+    mutationFn: (id) => appointmentAPI.updateStatus(id, 'cancelled'),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['appointments']);
+      toast({ title: "Appointment cancelled" });
+    }
+  });
+
+  const filtered = filter === "all"
+    ? appointments
+    : appointments.filter((a) => a.status === filter);
 
   const cancelAppointment = (id) => {
-    setAppointments((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: "rejected" } : a)),
-    );
-    toast({ title: "Appointment cancelled" });
+    cancelMutation.mutate(id);
   };
 
+  const updateProfileMutation = useMutation({
+    mutationFn: (data) => authAPI.updateProfile(data),
+    onSuccess: (data) => {
+      localStorage.setItem('userInfo', JSON.stringify({ ...userInfo, ...data }));
+      toast({ title: "Profile updated!" });
+    }
+  });
+
+  const [profile, setProfile] = useState({
+    name: userInfo.name || "",
+    email: userInfo.email || "",
+    phone: userInfo.phone || "",
+    address: userInfo.address || "",
+  });
+
+
+  const favoriteMutation = useMutation({
+    mutationFn: (id) => authAPI.toggleFavorite(id),
+    onSuccess: (newFavorites) => {
+      setFavorites(newFavorites);
+      const isFav = newFavorites.includes(docIdContext.current);
+      toast({ title: isFav ? "Added to favorites" : "Removed from favorites" });
+      
+      const updatedUser = { ...userInfo, favorites: newFavorites };
+      localStorage.setItem('userInfo', JSON.stringify(updatedUser));
+    }
+  });
+
+  const docIdContext = { current: null };
+
   const toggleFavorite = (docId) => {
-    setFavorites((prev) =>
-      prev.includes(docId)
-        ? prev.filter((id) => id !== docId)
-        : [...prev, docId],
-    );
-    toast({
-      title: favorites.includes(docId)
-        ? "Removed from favorites"
-        : "Added to favorites",
-    });
+    docIdContext.current = docId;
+    favoriteMutation.mutate(docId);
   };
 
   const downloadPrescription = (rx) => {
@@ -168,10 +228,10 @@ Notes: ${rx.notes}
                 <User className="h-4 w-4 text-accent-foreground" />
               </div>
               <span className="text-sm font-medium text-foreground hidden sm:inline">
-                John Doe
+                {userInfo.name}
               </span>
             </div>
-            <Link to="/">
+            <Link to="/login" onClick={() => localStorage.removeItem('userInfo')}>
               <Button variant="ghost" size="sm" className="gap-2">
                 <LogOut className="h-4 w-4" /> Logout
               </Button>
@@ -190,8 +250,9 @@ Notes: ${rx.notes}
               <h1 className="text-2xl font-bold text-foreground">
                 Patient Dashboard
               </h1>
-              <p className="text-muted-foreground">Welcome back, John!</p>
+              <p className="text-muted-foreground">Welcome back, {userInfo.name}!</p>
             </div>
+
             <Link to="/doctors">
               <Button className="gap-2">
                 <Calendar className="h-4 w-4" /> Book New
@@ -256,11 +317,9 @@ Notes: ${rx.notes}
                         className="bg-card rounded-xl p-5 card-shadow flex flex-col sm:flex-row sm:items-center gap-4"
                       >
                         <div className="h-12 w-12 rounded-xl hero-gradient flex items-center justify-center text-primary-foreground font-bold shrink-0">
-                          {apt.doctorName
-                            .split(" ")
-                            .slice(1)
-                            .map((n) => n[0])
-                            .join("")}
+                          {apt.doctorName 
+                            ? (apt.doctorName.split(" ").slice(1).map((n) => n ? n[0] : "").join("") || apt.doctorName[0] || "DR")
+                            : "DR"}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-foreground">
@@ -542,10 +601,12 @@ Notes: ${rx.notes}
                   </div>
                 </div>
                 <Button
-                  onClick={() => toast({ title: "Profile updated!" })}
+                  onClick={() => updateProfileMutation.mutate(profile)}
                   className="gap-2"
+                  disabled={updateProfileMutation.isPending}
                 >
-                  <Settings className="h-4 w-4" /> Save Changes
+                  <Settings className="h-4 w-4" /> 
+                  {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
             </div>

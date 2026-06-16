@@ -18,13 +18,13 @@ const contactInfo = [
   {
     icon: Mail,
     label: "Email",
-    value: "support@medibook.com",
-    href: "mailto:support@medibook.com",
+    value: "myazhagan907@gmail.com",
+    href: "mailto:myazhagan907@gmail.com",
   },
   {
     icon: MapPin,
     label: "Address",
-    value: "123 Health Avenue, Medical District, NY 10001",
+    value: "Coimbatore, NY 10001",
   },
   { icon: Clock, label: "Hours", value: "Mon–Fri: 8AM–8PM, Sat: 9AM–5PM" },
 ];

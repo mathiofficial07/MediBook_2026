@@ -1,10 +1,12 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Search, MapPin, Star, Filter } from "lucide-react";
+import { Search, MapPin, Star, Filter, Loader2, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { mockDoctors, SPECIALIZATION_LIST } from "@/lib/mockData";
+import { SPECIALIZATION_LIST } from "@/lib/mockData";
+import { doctorAPI } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
@@ -14,9 +16,30 @@ const Doctors = () => {
   const [search, setSearch] = useState("");
   const [specFilter, setSpecFilter] = useState("All");
   const [page, setPage] = useState(1);
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+
+  const { data: doctors, isLoading, error } = useQuery({
+    queryKey: ['doctors'],
+    queryFn: async () => {
+      const { data } = await doctorAPI.getDoctors();
+      return data.map(d => ({
+        id: d._id,
+        name: d.name,
+        specialization: d.doctorProfile.specialization,
+        avatar: d.avatar,
+        rating: d.doctorProfile.rating,
+        reviews: d.doctorProfile.reviews,
+        experience: d.doctorProfile.experience,
+        fee: d.doctorProfile.fee,
+        location: d.doctorProfile.location,
+        available: d.doctorProfile.available,
+      }));
+    }
+  });
 
   const filtered = useMemo(() => {
-    return mockDoctors.filter((d) => {
+    if (!doctors) return [];
+    return doctors.filter((d) => {
       const matchSearch =
         d.name.toLowerCase().includes(search.toLowerCase()) ||
         d.specialization.toLowerCase().includes(search.toLowerCase()) ||
@@ -24,7 +47,8 @@ const Doctors = () => {
       const matchSpec = specFilter === "All" || d.specialization === specFilter;
       return matchSearch && matchSpec;
     });
-  }, [search, specFilter]);
+  }, [search, specFilter, doctors]);
+
 
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
   const paged = filtered.slice(
@@ -37,6 +61,16 @@ const Doctors = () => {
       <Navbar />
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4">
+          <div className="flex justify-between items-start mb-6">
+            <div className="flex-1"></div>
+            {userInfo?.role === 'admin' && (
+              <Link to="/admin">
+                <Button className="gap-2">
+                  <Plus className="h-4 w-4" /> Go to Add Doctor
+                </Button>
+              </Link>
+            )}
+          </div>
           <div className="text-center mb-10">
             <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-3">
               Find Your Doctor
@@ -82,7 +116,16 @@ const Doctors = () => {
           </div>
 
           {/* Results */}
-          {paged.length === 0 ? (
+          {isLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : error ? (
+            <div className="text-center py-20 text-destructive">
+              Error loading doctors. Please try again later.
+            </div>
+          ) : paged.length === 0 ? (
+
             <div className="text-center py-20 text-muted-foreground">
               No doctors found matching your criteria.
             </div>

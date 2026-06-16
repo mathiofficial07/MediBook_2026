@@ -15,13 +15,64 @@ import { mockDoctors } from "@/lib/mockData";
 import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
 
+import { doctorAPI, appointmentAPI } from "@/lib/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
 const DoctorProfile = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
-  const doctor = mockDoctors.find((d) => d.id === id);
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedSlot, setSelectedSlot] = useState("");
+
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+
+  const { data: doctor, isLoading } = useQuery({
+    queryKey: ['doctor', id],
+    queryFn: async () => {
+      const { data } = await doctorAPI.getDoctorById(id);
+      return {
+        id: data._id,
+        name: data.name,
+        specialization: data.doctorProfile.specialization,
+        avatar: data.avatar,
+        rating: data.doctorProfile.rating,
+        reviews: data.doctorProfile.reviews,
+        location: data.doctorProfile.location,
+        fee: data.doctorProfile.fee,
+        experience: data.doctorProfile.experience,
+        education: data.doctorProfile.education,
+        bio: data.doctorProfile.bio,
+        available: data.doctorProfile.available,
+        slots: data.doctorProfile.slots,
+      };
+    },
+    enabled: !!id,
+  });
+
+  const bookingMutation = useMutation({
+    mutationFn: (data) => appointmentAPI.book(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      toast({
+        title: "Appointment Booked!",
+        description: `Your appointment with ${doctor.name} has been confirmed.`,
+      });
+      navigate("/patient-dashboard");
+    },
+    onError: (error) => {
+      toast({
+        title: "Booking failed",
+        description: error.response?.data?.message || "Something went wrong",
+        variant: "destructive",
+      });
+    }
+  });
+
+  if (isLoading) {
+    return <div className="min-h-screen bg-background flex items-center justify-center">Loading...</div>;
+  }
 
   if (!doctor) {
     return (
@@ -39,6 +90,11 @@ const DoctorProfile = () => {
   }
 
   const handleBook = () => {
+    if (!userInfo._id) {
+      toast({ title: "Please login to book", variant: "destructive" });
+      navigate("/login");
+      return;
+    }
     if (!selectedDate || !selectedSlot) {
       toast({
         title: "Please select date and time slot",
@@ -46,11 +102,12 @@ const DoctorProfile = () => {
       });
       return;
     }
-    toast({
-      title: "Appointment Booked!",
-      description: `With ${doctor.name} on ${selectedDate} at ${selectedSlot}`,
+    
+    bookingMutation.mutate({
+      doctorId: doctor.id,
+      date: selectedDate,
+      time: selectedSlot,
     });
-    navigate("/patient-dashboard");
   };
 
   // Generate next 7 days
@@ -59,6 +116,7 @@ const DoctorProfile = () => {
     d.setDate(d.getDate() + i + 1);
     return d.toISOString().split("T")[0];
   });
+
 
   return (
     <div className="min-h-screen bg-background">

@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
+import { authAPI } from "@/lib/api";
+
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,24 +17,41 @@ const Login = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      // Demo login routing
-      if (email.includes("admin")) {
-        toast({ title: "Welcome back, Admin!" });
-        navigate("/admin");
-      } else if (email.includes("doctor") || email.includes("dr")) {
-        toast({ title: "Welcome back, Doctor!" });
+    try {
+      const { data } = await authAPI.login(email, password);
+      
+      if (data.role === 'admin') {
+        toast({
+          title: "Access Denied",
+          description: "Administrators must login through the dedicated admin portal at /admin",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      localStorage.setItem('userInfo', JSON.stringify(data));
+      toast({ title: `Welcome back, ${data.name}!` });
+      
+      if (data.role === 'doctor') {
         navigate("/doctor-dashboard");
       } else {
-        toast({ title: "Welcome back!" });
         navigate("/patient-dashboard");
       }
-    }, 1000);
+    } catch (error) {
+      toast({
+        title: "Login Failed",
+        description: error.response?.data?.message || "Invalid email or password",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
+
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -147,9 +166,6 @@ const Login = () => {
               </li>
               <li>
                 <strong>Doctor:</strong> doctor@medibook.com
-              </li>
-              <li>
-                <strong>Admin:</strong> admin@medibook.com
               </li>
             </ul>
           </div>

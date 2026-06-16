@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   CalendarCheck,
@@ -44,12 +44,18 @@ const statusConfig = {
   },
 };
 
+import { doctorAPI, appointmentAPI, prescriptionAPI } from "@/lib/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
 const DoctorDashboard = () => {
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+
+  if (!userInfo || !userInfo._id || userInfo.role !== 'doctor') {
+    return <Navigate to="/login" replace />;
+  }
+
   const { toast } = useToast();
-  const doctor = mockDoctors[0];
-  const [appointments, setAppointments] = useState(
-    mockAppointments.filter((a) => a.doctorId === doctor.id),
-  );
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState("appointments");
   const [prescriptionFor, setPrescriptionFor] = useState(null);
   const [rxForm, setRxForm] = useState({
@@ -57,30 +63,115 @@ const DoctorDashboard = () => {
     medications: "",
     notes: "",
   });
-  const [slots, setSlots] = useState(doctor.slots);
-  const [newSlot, setNewSlot] = useState("");
-  const [profileForm, setProfileForm] = useState({
-    fee: String(doctor.fee),
-    experience: String(doctor.experience),
-    bio: doctor.bio,
-    education: doctor.education,
+
+  const { data: appointments = [], isLoading: appointmentsLoading } = useQuery({
+    queryKey: ['doctor-appointments', userInfo._id],
+    queryFn: async () => {
+      const { data } = await appointmentAPI.getMyAppointments();
+      return data.map(a => ({
+        id: a._id,
+        patientId: a.patient?._id || "",
+        patientName: a.patient?.name || "Unknown Patient",
+        patientEmail: a.patient?.email || "",
+        date: a.date,
+        time: a.time,
+        status: a.status,
+      }));
+    },
+    enabled: !!userInfo._id,
   });
 
-  const updateStatus = (id, status) => {
-    setAppointments((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status } : a)),
-    );
-    toast({ title: `Appointment ${status}` });
+  const { data: doctorProfile, isLoading: profileLoading } = useQuery({
+    queryKey: ['doctor-profile', userInfo._id],
+    queryFn: async () => {
+      const { data } = await doctorAPI.getDoctorById(userInfo._id);
+      return data;
+    },
+    enabled: !!userInfo._id && userInfo.role === 'doctor',
+  });
+
+  const doctor = doctorProfile ? {
+    name: doctorProfile.name,
+    avatar: doctorProfile.avatar || doctorProfile.name[0],
+    specialization: doctorProfile.doctorProfile?.specialization || "General Medicine",
+    rating: doctorProfile.doctorProfile?.rating || 0,
+    reviews: doctorProfile.doctorProfile?.reviews || 0,
+    experience: doctorProfile.doctorProfile?.experience || 0,
+    fee: doctorProfile.doctorProfile?.fee || 0,
+    education: doctorProfile.doctorProfile?.education || "",
+    bio: doctorProfile.doctorProfile?.bio || "",
+  } : {
+    name: userInfo.name || "",
+    avatar: userInfo.name ? userInfo.name[0] : "D",
+    specialization: "General Medicine",
+    rating: 0,
+    reviews: 0,
+    experience: 0,
+    fee: 0,
+    education: "",
+    bio: "",
   };
 
-  const addPrescription = (aptId) => {
-    toast({
-      title: "Prescription added",
-      description: `Prescription saved for appointment ${aptId}`,
-    });
-    setPrescriptionFor(null);
-    setRxForm({ diagnosis: "", medications: "", notes: "" });
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, status }) => appointmentAPI.updateStatus(id, status),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries(['doctor-appointments']);
+      toast({ title: `Appointment ${variables.status}` });
+    }
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: (data) => doctorAPI.updateProfile(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['doctor-profile']);
+      toast({ title: "Profile updated!" });
+    }
+  });
+
+  const prescriptionMutation = useMutation({
+    mutationFn: (data) => prescriptionAPI.create(data),
+    onSuccess: () => {
+      toast({ title: "Prescription added" });
+      setPrescriptionFor(null);
+      setRxForm({ diagnosis: "", medications: "", notes: "" });
+    }
+  });
+
+  const [slots, setSlots] = useState([]);
+  const [newSlot, setNewSlot] = useState("");
+  const [profileForm, setProfileForm] = useState({
+    fee: "",
+    experience: "",
+    bio: "",
+    education: "",
+  });
+
+  useEffect(() => {
+    if (doctorProfile) {
+      setSlots(doctorProfile.doctorProfile?.slots || []);
+      setProfileForm({
+        fee: String(doctorProfile.doctorProfile?.fee || ""),
+        experience: String(doctorProfile.doctorProfile?.experience || ""),
+        bio: doctorProfile.doctorProfile?.bio || "",
+        education: doctorProfile.doctorProfile?.education || "",
+      });
+    }
+  }, [doctorProfile]);
+
+  const updateStatus = (id, status) => {
+    updateStatusMutation.mutate({ id, status });
   };
+
+  const addPrescription = (aptId, patientId) => {
+    prescriptionMutation.mutate({
+      appointmentId: aptId,
+      patientId: patientId,
+      diagnosis: rxForm.diagnosis,
+      medications: rxForm.medications.split(',').map(m => ({ name: m.trim(), dosage: '', duration: '' })),
+      notes: rxForm.notes,
+    });
+  };
+
 
   const addSlot = () => {
     if (newSlot && !slots.includes(newSlot)) {
@@ -121,13 +212,13 @@ const DoctorDashboard = () => {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-full hero-gradient flex items-center justify-center text-primary-foreground text-xs font-bold">
-                {doctor.avatar}
+                {userInfo.avatar}
               </div>
               <span className="text-sm font-medium text-foreground hidden sm:inline">
-                {doctor.name}
+                {userInfo.name}
               </span>
             </div>
-            <Link to="/">
+            <Link to="/login" onClick={() => localStorage.removeItem('userInfo')}>
               <Button variant="ghost" size="sm" className="gap-2">
                 <LogOut className="h-4 w-4" /> Logout
               </Button>
@@ -145,8 +236,55 @@ const DoctorDashboard = () => {
             Doctor Dashboard
           </h1>
           <p className="text-muted-foreground mb-8">
-            Welcome back, {doctor.name}
+            Welcome back, {userInfo.name}
           </p>
+
+          {doctorProfile && !doctorProfile.doctorProfile?.isApproved && (
+            <div className={`p-6 rounded-2xl mb-8 border card-shadow ${doctorProfile.doctorProfile?.isApplied ? "bg-blue-50/50 border-blue-200" : "bg-orange-50/50 border-orange-200"}`}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className={`text-lg font-bold ${doctorProfile.doctorProfile?.isApplied ? "text-blue-800" : "text-orange-800"}`}>
+                    {doctorProfile.doctorProfile?.isApplied ? "Verification Status: Pending Review" : "Verification Status: Action Required"}
+                  </h3>
+                  <p className={`text-sm mt-1 ${doctorProfile.doctorProfile?.isApplied ? "text-blue-600" : "text-orange-600"}`}>
+                    {doctorProfile.doctorProfile?.isApplied 
+                      ? "Your profile has been submitted to the administrator and is pending approval. You will receive an email once approved."
+                      : "Please fill in all your profile details in the 'Profile' tab and click submit to send a verification request to the admin."
+                    }
+                  </p>
+                </div>
+                {!doctorProfile.doctorProfile?.isApplied && (
+                  <Button 
+                    onClick={() => {
+                      const complete = profileForm.fee && profileForm.experience && profileForm.education && profileForm.bio;
+                      if (!complete) {
+                        toast({
+                          title: "Profile Incomplete",
+                          description: "Please fill in all your profile details in the 'Profile' tab first.",
+                          variant: "destructive",
+                        });
+                        setTab("profile");
+                        return;
+                      }
+                      updateProfileMutation.mutate({
+                        doctorProfile: {
+                          ...profileForm,
+                          fee: Number(profileForm.fee),
+                          experience: Number(profileForm.experience),
+                          slots: slots,
+                          isApplied: true,
+                        }
+                      });
+                    }}
+                    className="shrink-0 bg-orange-600 hover:bg-orange-700 text-white"
+                  >
+                    Submit for Approval
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
 
           <div className="flex flex-wrap gap-2 mb-8">
             {tabs.map((t) => (
@@ -208,9 +346,9 @@ const DoctorDashboard = () => {
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                         <div className="h-12 w-12 rounded-full bg-accent flex items-center justify-center text-accent-foreground font-bold shrink-0">
-                          {apt.patientName
+                          {(apt.patientName || "Patient")
                             .split(" ")
-                            .map((n) => n[0])
+                            .map((n) => n ? n[0] : "")
                             .join("")}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -317,9 +455,10 @@ const DoctorDashboard = () => {
                           <div className="flex gap-2">
                             <Button
                               size="sm"
-                              onClick={() => addPrescription(apt.id)}
+                              onClick={() => addPrescription(apt.id, apt.patientId)}
                               className="gap-1"
                             >
+
                               <Save className="h-3.5 w-3.5" /> Save
                             </Button>
                             <Button
@@ -673,10 +812,19 @@ const DoctorDashboard = () => {
                   </div>
                 </div>
                 <Button
-                  onClick={() => toast({ title: "Profile updated!" })}
+                  onClick={() => updateProfileMutation.mutate({
+                    doctorProfile: {
+                      ...profileForm,
+                      fee: Number(profileForm.fee),
+                      experience: Number(profileForm.experience),
+                      slots: slots
+                    }
+                  })}
                   className="gap-2"
+                  disabled={updateProfileMutation.isPending}
                 >
-                  <Save className="h-4 w-4" /> Save Changes
+                  <Save className="h-4 w-4" /> 
+                  {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
             </div>

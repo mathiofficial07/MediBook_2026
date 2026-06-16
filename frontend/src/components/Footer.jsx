@@ -61,13 +61,13 @@ const Footer = () => (
           <h4 className="font-semibold mb-4">Contact Us</h4>
           <ul className="space-y-3 text-sm text-primary-foreground/60">
             <li className="flex items-center gap-2">
-              <Mail className="h-4 w-4 text-primary" /> support@medibook.com
+              <Mail className="h-4 w-4 text-primary" /> myazhagan907@gmail.com
             </li>
             <li className="flex items-center gap-2">
               <Phone className="h-4 w-4 text-primary" /> +1 (555) 123-4567
             </li>
             <li className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-primary" /> 123 Health St, NY
+              <MapPin className="h-4 w-4 text-primary" /> Coimbatore, NY 10001
             </li>
           </ul>
         </div>

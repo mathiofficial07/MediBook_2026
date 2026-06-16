@@ -16,6 +16,8 @@ const roles = [
   { value: "doctor", label: "Doctor", desc: "Manage patients & schedules" },
 ];
 
+import { authAPI } from "@/lib/api";
+
 const Register = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -26,15 +28,27 @@ const Register = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      toast({ title: "Account created!", description: "You can now sign in." });
+    try {
+      await authAPI.register({ name, email, password, role });
+      toast({ 
+        title: "Account created!", 
+        description: "You can now sign in with your credentials." 
+      });
       navigate("/login");
-    }, 1000);
+    } catch (error) {
+      toast({
+        title: "Registration Failed",
+        description: error.response?.data?.message || "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
+
 
   return (
     <div className="min-h-screen bg-background flex">
