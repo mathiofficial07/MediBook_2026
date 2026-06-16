@@ -636,7 +636,7 @@ const DoctorDashboard = () => {
                   },
                   {
                     label: "Revenue",
-                    value: `$${appointments.filter((a) => a.status === "completed").length * doctor.fee}`,
+                    value: `₹${appointments.filter((a) => a.status === "completed").length * doctor.fee}`,
                     icon: BarChart3,
                   },
                 ].map((s) => (
@@ -721,7 +721,7 @@ const DoctorDashboard = () => {
                         Fee per Visit
                       </span>
                       <span className="font-bold text-foreground">
-                        ${doctor.fee}
+                        ₹{doctor.fee}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -761,7 +761,7 @@ const DoctorDashboard = () => {
                 <div className="grid sm:grid-cols-2 gap-5 mb-6">
                   <div>
                     <label className="text-sm font-medium text-foreground mb-1.5 block">
-                      Consultation Fee ($)
+                      Consultation Fee (₹)
                     </label>
                     <Input
                       value={profileForm.fee}

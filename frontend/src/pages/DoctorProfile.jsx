@@ -162,7 +162,7 @@ const DoctorProfile = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-2xl font-bold text-foreground">
-                        ${doctor.fee}
+                        ₹{doctor.fee}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         per consultation

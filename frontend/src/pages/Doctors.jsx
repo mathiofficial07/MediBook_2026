@@ -172,7 +172,7 @@ const Doctors = () => {
                         {doc.experience} yrs exp
                       </span>
                       <span className="text-sm font-semibold text-foreground">
-                        ${doc.fee}
+                        ₹{doc.fee}
                       </span>
                     </div>
                     <div className="mt-3">

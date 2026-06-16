@@ -183,7 +183,7 @@ const AdminDashboard = () => {
       delta: "+8%",
     },
     { label: "Recent Logs", value: logs.length, icon: Activity, delta: "Live" },
-    { label: "Revenue", value: "$0", icon: TrendingUp, delta: "0%" },
+    { label: "Revenue", value: "₹0", icon: TrendingUp, delta: "0%" },
   ];
 
   const tabs = [
@@ -572,7 +572,7 @@ const AdminDashboard = () => {
                     </div>
                     <div>
                       <label className="text-sm font-medium text-foreground mb-1.5 block">
-                        Fee ($)
+                        Fee (₹)
                       </label>
                       <Input
                         placeholder="150"
@@ -674,7 +674,7 @@ const AdminDashboard = () => {
                     <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mb-3">
                       <span>⭐ {doc.doctorProfile?.rating || 0}</span>
                       <span>{doc.doctorProfile?.experience || 0} yrs</span>
-                      <span>${doc.doctorProfile?.fee || 0}/visit</span>
+                      <span>₹{doc.doctorProfile?.fee || 0}/visit</span>
                       <span>{doc.doctorProfile?.location || "Unknown"}</span>
                     </div>
 

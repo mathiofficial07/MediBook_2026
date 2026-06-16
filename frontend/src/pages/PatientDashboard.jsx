@@ -485,7 +485,7 @@ Notes: ${rx.notes}
                       <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mb-3">
                         <span>⭐ {doc.rating}</span>
                         <span>{doc.experience} yrs exp</span>
-                        <span>${doc.fee}/visit</span>
+                        <span>₹{doc.fee}/visit</span>
                         <span>{doc.location}</span>
                       </div>
                       <Link to={`/doctors/${doc.id}`}>
