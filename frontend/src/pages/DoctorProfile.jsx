@@ -264,14 +264,26 @@ const DoctorProfile = () => {
                 </div>
               )}
 
-              <Button
-                size="lg"
-                className="w-full sm:w-auto"
-                onClick={handleBook}
-                disabled={!doctor.available}
-              >
-                {doctor.available ? "Confirm Booking" : "Doctor Unavailable"}
-              </Button>
+              {!userInfo._id ? (
+                <Link to="/login" className="w-full sm:w-auto block sm:inline-block">
+                  <Button size="lg" className="w-full sm:w-auto">
+                    Log in to Book
+                  </Button>
+                </Link>
+              ) : userInfo.role !== 'patient' ? (
+                <Button size="lg" className="w-full sm:w-auto" disabled>
+                  Booking Restricted (Patients Only)
+                </Button>
+              ) : (
+                <Button
+                  size="lg"
+                  className="w-full sm:w-auto"
+                  onClick={handleBook}
+                  disabled={!doctor.available}
+                >
+                  {doctor.available ? "Confirm Booking" : "Doctor Unavailable"}
+                </Button>
+              )}
             </div>
           </motion.div>
         </div>

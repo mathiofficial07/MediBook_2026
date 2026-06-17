@@ -9,9 +9,19 @@ import { useToast } from "@/hooks/use-toast";
 
 import { authAPI } from "@/lib/api";
 
+const roles = [
+  {
+    value: "patient",
+    label: "Patient",
+    desc: "Book appointments & manage health",
+  },
+  { value: "doctor", label: "Doctor", desc: "Manage patients & schedules" },
+];
+
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState("patient");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -27,6 +37,16 @@ const Login = () => {
         toast({
           title: "Access Denied",
           description: "Administrators must login through the dedicated admin portal at /admin",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      if (data.role !== role) {
+        toast({
+          title: "Access Denied",
+          description: `This account is registered as a ${data.role}, but you selected ${role}.`,
           variant: "destructive",
         });
         setLoading(false);
@@ -90,6 +110,27 @@ const Login = () => {
           <p className="text-muted-foreground mb-8">
             Enter your credentials to access your account
           </p>
+
+          {/* Role selection */}
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            {roles.map((r) => (
+              <button
+                key={r.value}
+                type="button"
+                onClick={() => setRole(r.value)}
+                className={`p-3 rounded-xl border-2 text-left transition-all ${
+                  role === r.value
+                    ? "border-primary bg-accent"
+                    : "border-border hover:border-primary/40"
+                }`}
+              >
+                <p className="text-sm font-semibold text-foreground">
+                  {r.label}
+                </p>
+                <p className="text-xs text-muted-foreground">{r.desc}</p>
+              </button>
+            ))}
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
